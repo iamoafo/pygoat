@@ -1,29 +1,37 @@
-FROM python:3.11-slim-buster
+FROM python:3.11-slim-bullseye
 
-# set work directory
+# Set work directory
 WORKDIR /app
 
-# dependencies for psycopg2
-RUN apt-get update && apt-get install --no-install-recommends -y \
+# Install system dependencies for psycopg2 and DNS utilities
+RUN apt-get update \
+ && apt-get install --no-install-recommends -y \
     dnsutils \
     libpq-dev \
     python3-dev \
+    gcc \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Install dependencies
+# Upgrade pip to the desired version
 RUN python -m pip install --no-cache-dir pip==22.0.4
-COPY requirements.txt requirements.txt
+
+# Install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# copy project
+# Copy the project files
 COPY . /app/
 
+# Run migrations
+RUN python3 manage.py migrate
+
+# Expose port
 EXPOSE 8000
 
-RUN python3 /app/manage.py migrate
+# Start the application
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "6", "pygoat.wsgi"]
